@@ -37,6 +37,13 @@ app.use(session({
   }
 }))
 
+// Extend session type
+declare module 'express-session' {
+  interface SessionData {
+    authenticated: boolean
+  }
+}
+
 // Authentication middleware
 const requireAuth = (req: any, res: any, next: any) => {
   if (req.session.authenticated) {
@@ -295,7 +302,7 @@ app.post('/api/pos/orders/:id/workflow', async (req, res) => {
       .from(workflowStages)
       .where(and(
         eq(workflowStages.orderId, orderData.id),
-        eq(workflowStages.stage, orderData.currentStage)
+        eq(workflowStages.stage, orderData.currentStage || '')
       ))
       .orderBy(desc(workflowStages.startedAt))
       .limit(1)
@@ -358,7 +365,7 @@ app.post('/api/pos/orders/:id/workflow', async (req, res) => {
           subject: `Repair Update - Order ${orderData.orderId}`,
           type: 'status_update',
           data: {
-            customerName: orderData.customerName,
+            customerName: orderData.customerName || 'Customer',
             orderId: orderData.orderId,
             deviceInfo: `${orderData.deviceBrand} ${orderData.deviceModel}`,
             currentStage: stage,
@@ -508,7 +515,10 @@ app.get('/api/reports/daily/:date', async (req, res) => {
     const paymentTotals = dailyPayments.reduce((acc, payment) => {
       const amount = parseFloat(payment.amount)
       acc.total += amount
-      acc[payment.method] = (acc[payment.method] || 0) + amount
+      const method = payment.method as keyof typeof acc
+      if (method !== 'total') {
+        acc[method] = (acc[method] || 0) + amount
+      }
       return acc
     }, { total: 0, cash: 0, card: 0, mobile: 0, check: 0 })
 
